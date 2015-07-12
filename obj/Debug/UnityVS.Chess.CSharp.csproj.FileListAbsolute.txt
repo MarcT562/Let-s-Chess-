@@ -1,0 +1,11 @@
+C:\Users\The Wizard\Documents\Chess\obj\Debug\UnityVS.Chess.CSharp.csprojResolveAssemblyReference.cache
+C:\Users\The Wizard\Documents\Chess\Temp\UnityVS_bin\Debug\Assembly-CSharp.dll
+C:\Users\The Wizard\Documents\Chess\Temp\UnityVS_bin\Debug\Assembly-CSharp.pdb
+C:\Users\The Wizard\Documents\Chess\Temp\UnityVS_bin\Debug\UnityEditor.dll
+C:\Users\The Wizard\Documents\Chess\Temp\UnityVS_bin\Debug\UnityEngine.dll
+C:\Users\The Wizard\Documents\Chess\Temp\UnityVS_bin\Debug\UnityEngine.UI.dll
+C:\Users\The Wizard\Documents\Chess\Temp\UnityVS_bin\Debug\UnityEngine.xml
+C:\Users\The Wizard\Documents\Chess\Temp\UnityVS_bin\Debug\UnityEditor.xml
+C:\Users\The Wizard\Documents\Chess\Temp\UnityVS_bin\Debug\UnityEngine.UI.xml
+C:\Users\The Wizard\Documents\Chess\obj\Debug\Assembly-CSharp.dll
+C:\Users\The Wizard\Documents\Chess\obj\Debug\Assembly-CSharp.pdb
