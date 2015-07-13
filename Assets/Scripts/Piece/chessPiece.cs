@@ -4,7 +4,9 @@ using System.Collections.Generic;
 
 public class chessPiece : componentPiece
 {
-    public enum TeamColor { BLACK, WHITE };
+    public enum TeamColor { BLACK, WHITE, NONE, ALL };
+
+    public static bool canAttackOwnUnits = false;   //Completely uncessary, and A total hack for the fun of it.
     
     private chessPieceType _pieceType;
     private TeamColor _color;
@@ -23,10 +25,7 @@ public class chessPiece : componentPiece
 
     public override bool canMoveTo(int x, int y, controllerBoard board)
     {
-        if(_validMoves == null)
-        {
-            _validMoves = _pieceType.generateMoveList(board, this);
-        }
+        getValidMoveList(board);
 
         foreach (Vector2 validMove in _validMoves)
         {
@@ -42,10 +41,7 @@ public class chessPiece : componentPiece
         List<componentPiece> piecesAtDestination = board.getPiecesAtLocation(x, y);
 
         base.moveTo(x, y, board);
-        if (_validMoves != null)
-        {
-            _validMoves = null;
-        }
+        clearValidMoves();
 
         if(piecesAtDestination.Count > 0)
         {
@@ -65,17 +61,14 @@ public class chessPiece : componentPiece
     {
         if(_validMoves == null)
         {
-            _validMoves = _pieceType.generateMoveList(board, this);
+            _validMoves = _pieceType.generateMoveList(board, this, canAttackOwnUnits);
         }
         return _validMoves;
     }
 
     public override bool hasValidMoveAt(int x, int y, controllerBoard board)
     {
-        if(_validMoves == null)
-        {
-            _validMoves = _pieceType.generateMoveList(board, this);
-        }
+        getValidMoveList(board);
         return base.hasValidMoveAt(x, y, board);
     }
 
@@ -84,5 +77,10 @@ public class chessPiece : componentPiece
     public bool canAttack(int x, int y, controllerBoard board)
     {
         return _pieceType.canAttack(x, y, board, this);
+    }
+
+    public void clearCanAttackCache()
+    {
+        _pieceType.clearCanAttackCache();
     }
 }

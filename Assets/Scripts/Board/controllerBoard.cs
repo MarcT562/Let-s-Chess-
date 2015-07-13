@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using UnityEngine.UI;
 using System.Collections;
 using System.Collections.Generic;
 
@@ -10,6 +11,7 @@ public class controllerBoard : MonoBehaviour
     public static int BOARD_Z = 0;
     public static int TILE_EFFECT_Z = -1;
     public static int PIECE_Z = -5;
+    public static int TURN_GAME_OVER = -1;
 
     //Origin for a chess board is the bottom left with white on the bottom. a-h 1-8, but for my case i'm using 0-based numbers for both because computer, but with the same directionality
     private static float BOARD_OFFSET_X = -2.8f;
@@ -25,11 +27,19 @@ public class controllerBoard : MonoBehaviour
 
     private bool _mouseDown;
 
-
     //This should definitely end up being subclassed into controllerChessBoard... but for the current purposes this will do.
     private List<componentPiece> _captured;
+    private chessGameMode _gameMode;
+    private int _numTurns;
+    private int _currentTurn;
+    private chessPiece.TeamColor[] _playerColors;
+    private bool[] _playerActive;   //in case there are more than 2 players...
+    private bool _inCheck;
+    private controllerUI _UI;
 
-	void Start () {
+    void Start()
+    {
+        _UI = gameObject.GetComponent<controllerUI>();
         _commandHistory = new List<boardCommand>();
         _pieces = new List<componentPiece>();
         _validMoveTileEffects = new List<GameObject>();
@@ -44,7 +54,7 @@ public class controllerBoard : MonoBehaviour
         selectedThing.renderer.enabled = false;
 
         //Start a brand new game of chess
-        initNewChessGame();
+        initNewChessGame(chessGameMode.SOLO);
 
         //TEST SECTION
         //GameObject whitePawn1Object = GameObject.Find("WhitePawn1");
@@ -166,36 +176,67 @@ public class controllerBoard : MonoBehaviour
                 }
             }
         }
-        /*
-         */
 	}
 
-    /*
-    void onMouseDown()
+    public void initNewChessGame(chessGameMode mode)
     {
-        Debug.Log("Mouse Down");
-        if(_mouseDown == false)
-        {
-            _mouseDown = true;
-        }
-    }
+        clear();
 
-    void onMouseUp()
-    {
-        Debug.Log("Mouse Up");
-        if(_mouseDown == true)
-        {
-            Debug.Log("click with mouseUp");
-            _mouseDown = false;
-        }
-    }
-     */
-
-    private void initNewChessGame()
-    {
+        _gameMode = mode;
         _captured = new List<componentPiece>();
 
-        //Instead of creating sub classes I am using the type pattern.
+        //leaving this out here to make the switch simpler.
+        if (_gameMode == chessGameMode.SOLO_SELF_ATTACK || _gameMode == chessGameMode.TWO_PLAYER_SELF_ATTACK)
+        {
+            chessPiece.canAttackOwnUnits = true;
+        }
+        else
+        {
+            chessPiece.canAttackOwnUnits = false;
+        }
+
+        //Using a switch because this is a prototype. If it was a final product I would make each game mode derived from a base chessGameMode class
+        // That would be so that any game mode wanted could be created, with inheiritance, and have more long-term flexibility.
+        switch(_gameMode)
+        {
+            case chessGameMode.SOLO_SELF_ATTACK:
+            case chessGameMode.SOLO:
+                _currentTurn = 0;
+
+                _playerColors = new chessPiece.TeamColor[1];
+                _playerColors[0] = chessPiece.TeamColor.ALL;
+
+                _playerActive = new bool[1];
+                _playerActive[0] = true;
+                break;
+            case chessGameMode.TWO_PLAYER_SELF_ATTACK:
+            case chessGameMode.TWO_PLAYER:
+                _currentTurn = 0;
+
+                _playerColors = new chessPiece.TeamColor[2];
+                _playerColors[0] = chessPiece.TeamColor.WHITE;
+                _playerColors[1] = chessPiece.TeamColor.BLACK;
+                
+                _playerActive = new bool[2];
+                _playerActive[0] = true;
+                _playerActive[1] = true;
+                break;
+            case chessGameMode.TWO_AND_A_DIETY:
+                _currentTurn = 0;
+
+                _playerColors = new chessPiece.TeamColor[3];
+                _playerColors[0] = chessPiece.TeamColor.WHITE;
+                _playerColors[1] = chessPiece.TeamColor.BLACK;
+                _playerColors[2] = chessPiece.TeamColor.ALL;
+
+                _playerActive = new bool[3];
+                _playerActive[0] = true;
+                _playerActive[1] = true;
+                _playerActive[2] = true;
+                break;
+        }
+
+        //Instead of creating sub classes for the pieces I am using the type pattern.
 
         //Sprites
 
@@ -252,6 +293,7 @@ public class controllerBoard : MonoBehaviour
                         {
                             validMoves.Add(new Vector2(tempX, tempY));
                         }
+                        tempY -= (1 * forward); //because of the attack from start.
                     }
                 }
                 //This is inside the onboard check because if 1 square foward is off board then a pawn CANNOT attack, because it has to move at least 1 square forward, and the board is square.
@@ -743,6 +785,19 @@ public class controllerBoard : MonoBehaviour
                 }   
             }
 
+            //clear the canAttackCache
+            foreach (componentPiece aPiece in _pieces)
+            {
+                chessPiece cPiece = (chessPiece)aPiece;
+                if (cPiece.getTeamColor() != piece.getTeamColor())
+                {
+                    if (!cPiece.getPieceTypeName().Equals("King"))   //Special case because kings have to caluclate other unit move positions
+                    {
+                        cPiece.clearCanAttackCache();
+                    }
+                }
+            }
+
             //DEBUG STUFF
             foreach (Vector2 validMove in validMoves)
             {
@@ -783,6 +838,8 @@ public class controllerBoard : MonoBehaviour
         createChessPiece("BlackKing", king, blackKingSprite, 4, 7, chessPiece.TeamColor.BLACK);
         createChessPiece("WhiteKing", king, whiteKingSprite, 4, 0, chessPiece.TeamColor.WHITE);
 
+        //Say the right turn.
+        setupNewGameUI();
     }
 
     private chessPiece createChessPiece(string objectName, chessPieceType type, Sprite sprite, int x, int y, chessPiece.TeamColor teamColor)
@@ -932,16 +989,34 @@ public class controllerBoard : MonoBehaviour
 
     private bool selectPiece(componentPiece piece)
     {
-        deselectPiece();
-        _selectedPiece = piece;
+        //Validate the piece can be selected
+        if (_currentTurn == TURN_GAME_OVER)
+        {
+            return false;
+        }
+        if (_gameMode != chessGameMode.NONE) //If it's a chess game.
+        {
+            chessPiece cPiece = (chessPiece) piece;
+            if((cPiece.getTeamColor() != _playerColors[_currentTurn]) && (_playerColors[_currentTurn] != chessPiece.TeamColor.ALL))
+            {
+                return false;
+            }
+        }
 
+        //Deselect last selected piece if there was one
+        deselectPiece();
+
+        //Select the new piece
+        _selectedPiece = piece;
         Vector2 location = _selectedPiece.getLocation();
 
+        //Move the selected tile object
         GameObject selectedThing = GameObject.Find("Selected Tile");
         selectedThing.renderer.enabled = true;
         //Debug.Log("Location : " + location.x + "," + location.y);
         selectedThing.transform.localPosition = new Vector3(BOARD_OFFSET_X + ((int)location.x * BOARD_TILE_WIDTH), BOARD_OFFSET_Y + ((int)location.y * BOARD_TILE_HEIGHT), TILE_EFFECT_Z);
 
+        //Generate the valid move tile effect objects
         foreach(Vector2 validMove in piece.getValidMoveList(this))
         {
             GameObject moveTileEffect = new GameObject("ValidMoveTile"+_validMoveTileEffects.Count);
@@ -982,5 +1057,212 @@ public class controllerBoard : MonoBehaviour
     public List<componentPiece> getActivePieces()
     {
         return _pieces;
+    }
+
+    public void clear()
+    {
+        deselectPiece();    //Clear movement tiles
+
+        if (_captured != null)
+        {
+            foreach (componentPiece piece in _captured) //Clear captured pieces.
+            {
+                Destroy(piece.gameObject);
+            }
+            _captured.Clear();
+        }
+
+        if (_pieces != null)
+        {
+            foreach (componentPiece piece in _pieces)   //Clear active pieces.
+            {
+                Destroy(piece.gameObject);
+            }
+            _pieces.Clear();
+        }
+
+        if (_commandHistory != null)
+        {
+            _commandHistory.Clear();
+        }
+
+        _numTurns = 0;
+    }
+
+    public void changeTurn(int numTurns = 1)
+    {
+        _numTurns += numTurns;
+        _currentTurn += numTurns;
+
+        int turnInc = 0;
+        while(_playerActive[_currentTurn % _playerColors.Length] == false)
+        {
+            turnInc++;
+            _currentTurn++;
+
+            if(turnInc >= _playerColors.Length)
+            {
+                //no active players left.
+                gameOver(0);
+                return;
+            }
+        }
+
+        if(_currentTurn >= _playerColors.Length)    //Allowing for turn skipping.
+        {
+            _currentTurn = _currentTurn % _playerColors.Length;
+        }
+
+
+        switch(_gameMode)
+        {
+            case chessGameMode.TWO_PLAYER:
+            case chessGameMode.TWO_PLAYER_SELF_ATTACK:
+            case chessGameMode.TWO_AND_A_DIETY:
+            case chessGameMode.ASYNCHRONOUS:
+                _inCheck = false;
+
+                //Check for kings
+                Vector2[] kingLocation = new Vector2[_playerColors.Length];
+                bool[] hasKing = new bool[_playerColors.Length];
+                int totalKings = 0;
+                int activePlayers = getNumActivePlayers();
+
+                for (int i = 0; i < _playerColors.Length; i++)
+                {
+                    hasKing[i] = false;
+                }
+
+                foreach (componentPiece piece in _pieces)   //Make sure both sides still have a king.
+                {
+                    chessPiece cPiece = (chessPiece)piece;
+                    if (cPiece.getPieceTypeName().Equals("King"))
+                    {
+                        for (int i = 0; i < _playerColors.Length; i++)
+                        {
+                            if (_playerColors[i] == cPiece.getTeamColor())
+                            {
+                                totalKings++;
+                                kingLocation[i] = cPiece.getLocation();
+                                hasKing[i] = true;
+                                Debug.Log(_playerColors[i] + " has a king.");
+                                break;
+                            }
+                        }
+                        if (totalKings >= activePlayers)
+                        {
+                            Debug.Log("There is at least 1 king per player.");
+                            break;
+                        }
+                    }
+                }
+
+                Debug.Log("Test1.");
+
+                if(totalKings < activePlayers)
+                {
+                    Debug.Log("There are less kings than active players.");
+                    for (int i = 0; i < _playerColors.Length; i++)
+                    {
+                        Debug.Log("Checking Player Color " + _playerColors[i]);
+                        if (hasKing[i] == false)
+                        {
+                            activePlayers--;
+                            if (_playerColors[i] != chessPiece.TeamColor.ALL)
+                            {
+                                _playerActive[i] = false;
+                            }
+                        }
+                    }
+
+                    turnInc = 0;
+                    while (_playerActive[_currentTurn % _playerColors.Length] == false)
+                    {
+                        turnInc++;
+                        _currentTurn++;
+
+                        if (turnInc >= _playerColors.Length)
+                        {
+                            //no active players left.
+                            gameOver(0);
+                            return;
+                        }
+                    }
+
+                    if(activePlayers == 1)
+                    {
+                        for (int i = 0; i < _playerColors.Length; i++)
+                        {
+                            if (kingLocation[i] != null)
+                            {
+                                gameOver(i);
+                                return;
+                            }
+                        }
+                    }
+                }
+
+                List<chessPiece> checkingKing = new List<chessPiece>();
+                foreach (componentPiece piece in _pieces) //Check if current player is in check.
+                {
+                    chessPiece cPiece = (chessPiece)piece;
+                    if(cPiece.getTeamColor() != _playerColors[_currentTurn])
+                    {
+                        if (cPiece.canAttack((int)kingLocation[_currentTurn].x, (int)kingLocation[_currentTurn].y, this))
+                        {
+                            _inCheck = true;
+                            checkingKing.Add(cPiece);
+                        }
+                    }
+                }
+
+                if(_inCheck == true)
+                {
+                    Debug.Log(_playerColors[_currentTurn] + " is in Check!");
+                    //You are in check. Is it checkmate?
+                    //Note: The prototype of this check will take ridiculously long to make and run so i'll just put the pseudocode here.
+                    //If the king can move, the king is not in checkmate
+                    //If the king cannot move:
+                        //Check if any player owned pieces can intercept the checking pieces.
+                        //Theoretical method 1: simulate the move and recalculate all opposing pieces for each valid move... (lots of cpu time)
+                        //Theoretical Method 2: add in to the move validitiy check to make sure you can't move your own unit to put yourself in check, then do method 1, but then you only need to check if it blocks the checking piece.
+                }
+                break;
+        }
+
+        updateTurnUI();
+    }
+
+    private int getNumActivePlayers()
+    {
+        int numActive = 0;
+        for(int i = 0; i < _playerActive.Length; i++)
+        {
+            if(_playerActive[i] == true)
+            {
+                numActive++;
+            }
+        }
+        return numActive;
+    }
+
+    private void gameOver(int winnerIdx)
+    {
+        Debug.Log("Game Over");
+        Debug.Log("Winner : " + _playerColors[winnerIdx]);
+        _currentTurn = TURN_GAME_OVER;
+
+        _UI.victory("" + _playerColors[winnerIdx]);
+    }
+
+    private void setupNewGameUI()
+    {
+        _UI.setupNewGameUI(_gameMode);
+        updateTurnUI();
+    }
+
+    private void updateTurnUI()
+    {
+        _UI.setTurnTxt("" + _playerColors[_currentTurn]);   //Hacky way to turn it into a string.
     }
 }

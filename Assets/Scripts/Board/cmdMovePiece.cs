@@ -50,6 +50,7 @@ public class cmdMovePiece : boardCommand
                     aPiece.clearValidMoves();
                 }
             }
+            board.changeTurn();
             return true;
         }
         else
