@@ -26,7 +26,7 @@ public class cmdCapturePiece : boardCommand
             capturedY -= controllerBoard.BOARD_HEIGHT;
         }
 
-        board.movePieceToLocation(_captured, capturedX, capturedY, false);
+        board.setPieceLocation(_captured, capturedX, capturedY, false);
 
         return true;
     }

@@ -4,7 +4,7 @@ using System.Collections.Generic;
 
 public class chessPiece : componentPiece
 {
-    public enum TeamColor { BLACK, WHITE, NONE, ALL };
+    public enum TeamColor { WHITE, BLACK, NONE, ALL };
 
     public static bool canAttackOwnUnits = false;   //Completely uncessary, and A total hack for the fun of it.
     

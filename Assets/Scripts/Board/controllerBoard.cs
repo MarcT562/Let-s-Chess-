@@ -24,6 +24,7 @@ public class controllerBoard : MonoBehaviour
     private List<componentPiece> _pieces;
     private componentPiece _selectedPiece;
     private List<GameObject> _validMoveTileEffects;
+    private bool _inputAllowed = true;
 
     private bool _mouseDown;
 
@@ -35,11 +36,18 @@ public class controllerBoard : MonoBehaviour
     private chessPiece.TeamColor[] _playerColors;
     private bool[] _playerActive;   //in case there are more than 2 players...
     private bool _inCheck;
+    private delegateMoveSelectedPieceToLocation moveSelectedPieceToLocation;
+
     private controllerUI _UI;
+    private controllerSFS _controllerSFS;
+
+    delegate void delegateMoveSelectedPieceToLocation(int x, int y);
 
     void Start()
     {
         _UI = gameObject.GetComponent<controllerUI>();
+        _controllerSFS = gameObject.GetComponent<controllerSFS>();
+
         _commandHistory = new List<boardCommand>();
         _pieces = new List<componentPiece>();
         _validMoveTileEffects = new List<GameObject>();
@@ -51,12 +59,22 @@ public class controllerBoard : MonoBehaviour
         GameObject selectedThing = GameObject.Find("Selected Tile");
         selectedThing.transform.SetParent(gameObject.transform, false);
         selectedThing.transform.localPosition = new Vector3(1, 1, TILE_EFFECT_Z);
-        selectedThing.renderer.enabled = false;
+        selectedThing.GetComponent<Renderer>().enabled = false;
 
         //Start a brand new game of chess
         initNewChessGame(chessGameMode.SOLO);
 
         //TEST SECTION
+        /*
+        List<pieceData> setupTest = new List<pieceData>();
+        setupTest.Add(new pieceData("Test_1", true, chessPiece.TeamColor.WHITE, enumChessPieceType.KING, 0, 0));
+        setupTest.Add(new pieceData("Test_2", true, chessPiece.TeamColor.BLACK, enumChessPieceType.KING, 7, 7));
+        setupTest.Add(new pieceData("Test_3", true, chessPiece.TeamColor.WHITE, enumChessPieceType.QUEEN, 3, 3));
+        setupTest.Add(new pieceData("Test_4", true, chessPiece.TeamColor.BLACK, enumChessPieceType.QUEEN, 5, 5));
+
+        initNewChessGame(chessGameMode.ASYNCHRONOUS, setupTest, chessPiece.TeamColor.WHITE, 0);
+         */
+
         //GameObject whitePawn1Object = GameObject.Find("WhitePawn1");
         //componentPiece whitePawn1 = whitePawn1Object.GetComponent<componentPiece>();
         //GameObject whiteRook0Object = GameObject.Find("WhiteRook0");
@@ -107,78 +125,90 @@ public class controllerBoard : MonoBehaviour
         */
 
         //Being lazy with creating the click.
-        
-        if(Input.GetMouseButtonDown(0) && _mouseDown == false)
+        if(_inputAllowed &&
+                (
+                    (_gameMode != chessGameMode.ASYNCHRONOUS) ||
+                    (_gameMode == chessGameMode.ASYNCHRONOUS && _currentTurn == 0)
+                )
+            )
         {
-            _mouseDown = true;
-        }
+            if(Input.GetMouseButtonDown(0) && _mouseDown == false)
+            {
+                _mouseDown = true;
+            }
 
-        if(Input.GetMouseButtonUp(0) && _mouseDown == true)
-        {
-            _mouseDown = false;
+            if(Input.GetMouseButtonUp(0) && _mouseDown == true)
+            {
+                _mouseDown = false;
 
             
-            RaycastHit2D hit = Physics2D.Raycast(Camera.main.ScreenToWorldPoint(Input.mousePosition), new Vector2(0,0));
-            if(hit != null && hit.collider != null)
-            {
-                Debug.Log("Raycast hit " + hit.collider.gameObject.name);
-                componentPiece pieceHit = hit.collider.gameObject.GetComponent<componentPiece>();
-                componentValidMoveTile moveTileHit = hit.collider.gameObject.GetComponent<componentValidMoveTile>();
-                if(pieceHit != null)
+                RaycastHit2D hit = Physics2D.Raycast(Camera.main.ScreenToWorldPoint(Input.mousePosition), new Vector2(0,0));
+                if(hit != null && hit.collider != null)
                 {
-                    Debug.Log("Raycast hit a piece");
+                    Debug.Log("Raycast hit " + hit.collider.gameObject.name);
+                    componentPiece pieceHit = hit.collider.gameObject.GetComponent<componentPiece>();
+                    componentValidMoveTile moveTileHit = hit.collider.gameObject.GetComponent<componentValidMoveTile>();
+                    if(pieceHit != null)
+                    {
+                        Debug.Log("Raycast hit a piece");
 
-                    if(_pieces.Contains(pieceHit) == false)
-                    {
-                        return;
-                    }
-
-                    if(pieceHit == _selectedPiece)
-                    {
-                        deselectPiece();
-                        return;
-                    }
-                    else
-                    {
-                        if (_selectedPiece != null)
+                        if(_pieces.Contains(pieceHit) == false)
                         {
-                            bool moveIsValid = false;
-                            foreach (Vector2 validMove in _selectedPiece.getValidMoveList(this))
+                            return;
+                        }
+
+                        if(pieceHit == _selectedPiece)
+                        {
+                            deselectPiece();
+                            return;
+                        }
+                        else
+                        {
+                            if (_selectedPiece != null)
                             {
-                                Vector2 pieceHitLocation = pieceHit.getLocation();
-                                if (validMove == pieceHitLocation)
+                                bool moveIsValid = false;
+                                foreach (Vector2 validMove in _selectedPiece.getValidMoveList(this))
                                 {
-                                    moveSelectedPieceToLocation((int)pieceHitLocation.x, (int)pieceHitLocation.y);
-                                    deselectPiece();
-                                    moveIsValid = true;
+                                    Vector2 pieceHitLocation = pieceHit.getLocation();
+                                    if (validMove == pieceHitLocation)
+                                    {
+                                        moveSelectedPieceToLocation((int)pieceHitLocation.x, (int)pieceHitLocation.y);
+                                        deselectPiece();
+                                        moveIsValid = true;
+                                        return;
+                                    }
+                                }
+                                if (moveIsValid == false)
+                                {
+                                    selectPiece(pieceHit);
                                     return;
                                 }
                             }
-                            if (moveIsValid == false)
+                            else
                             {
                                 selectPiece(pieceHit);
                                 return;
                             }
                         }
-                        else
-                        {
-                            selectPiece(pieceHit);
-                            return;
-                        }
                     }
-                }
-                else if (moveTileHit != null)
-                {
-                    Vector2 moveTileHitLocation = moveTileHit.getLocation();
-                    moveSelectedPieceToLocation((int)moveTileHitLocation.x, (int)moveTileHitLocation.y);
-                    deselectPiece();
-                    return;
+                    else if (moveTileHit != null)
+                    {
+                        Vector2 moveTileHitLocation = moveTileHit.getLocation();
+                        moveSelectedPieceToLocation((int)moveTileHitLocation.x, (int)moveTileHitLocation.y);
+                        deselectPiece();
+                        return;
+                    }
                 }
             }
         }
 	}
 
-    public void initNewChessGame(chessGameMode mode)
+    public void setInputAllowed(bool enabled)
+    {
+        _inputAllowed = enabled;
+    }
+
+    public void initNewChessGame(chessGameMode mode, List<pieceData> setup = null, chessPiece.TeamColor playerColor = chessPiece.TeamColor.NONE, int currentTurn = 0, bool isGameOver = false, int winner = -1)
     {
         clear();
 
@@ -194,6 +224,14 @@ public class controllerBoard : MonoBehaviour
         {
             chessPiece.canAttackOwnUnits = false;
         }
+        if (_gameMode == chessGameMode.ASYNCHRONOUS)
+        {
+            moveSelectedPieceToLocation = moveSelectedPieceToLocationAsynchronous;
+        }
+        else
+        {
+            moveSelectedPieceToLocation = moveSelectedPieceToLocationLocal;
+        }
 
         //Using a switch because this is a prototype. If it was a final product I would make each game mode derived from a base chessGameMode class
         // That would be so that any game mode wanted could be created, with inheiritance, and have more long-term flexibility.
@@ -201,8 +239,6 @@ public class controllerBoard : MonoBehaviour
         {
             case chessGameMode.SOLO_SELF_ATTACK:
             case chessGameMode.SOLO:
-                _currentTurn = 0;
-
                 _playerColors = new chessPiece.TeamColor[1];
                 _playerColors[0] = chessPiece.TeamColor.ALL;
 
@@ -211,8 +247,6 @@ public class controllerBoard : MonoBehaviour
                 break;
             case chessGameMode.TWO_PLAYER_SELF_ATTACK:
             case chessGameMode.TWO_PLAYER:
-                _currentTurn = 0;
-
                 _playerColors = new chessPiece.TeamColor[2];
                 _playerColors[0] = chessPiece.TeamColor.WHITE;
                 _playerColors[1] = chessPiece.TeamColor.BLACK;
@@ -222,8 +256,6 @@ public class controllerBoard : MonoBehaviour
                 _playerActive[1] = true;
                 break;
             case chessGameMode.TWO_AND_A_DIETY:
-                _currentTurn = 0;
-
                 _playerColors = new chessPiece.TeamColor[3];
                 _playerColors[0] = chessPiece.TeamColor.WHITE;
                 _playerColors[1] = chessPiece.TeamColor.BLACK;
@@ -234,7 +266,18 @@ public class controllerBoard : MonoBehaviour
                 _playerActive[1] = true;
                 _playerActive[2] = true;
                 break;
+            case chessGameMode.ASYNCHRONOUS:
+                _playerColors = new chessPiece.TeamColor[2];
+                _playerColors[0] = playerColor;
+                _playerColors[1] = (playerColor == chessPiece.TeamColor.WHITE)?(chessPiece.TeamColor.BLACK):(chessPiece.TeamColor.WHITE); //(playerColor == chessPiece.TeamColor.WHITE) ? (chessPiece.TeamColor.BLACK) : (chessPiece.TeamColor.WHITE);
+
+                _playerActive = new bool[2];
+                _playerActive[0] = true;
+                _playerActive[1] = true;
+                break;
         }
+
+        _currentTurn = currentTurn;
 
         //Instead of creating sub classes for the pieces I am using the type pattern.
 
@@ -807,39 +850,101 @@ public class controllerBoard : MonoBehaviour
             return validMoves;
         };
 
-        //Make Pawns
-        for (int x = 0; x < 8; x++)
+        switch(_gameMode)
         {
-            createChessPiece("BlackPawn" + x, pawn, blackPawnSprite, x, 6, chessPiece.TeamColor.BLACK);
-            createChessPiece("WhitePawn" + x, pawn, whitePawnSprite, x, 1, chessPiece.TeamColor.WHITE);
-        }
-        //Make Rooks
-        for (int x = 0; x < 2; x++)
-        {
-            createChessPiece("BlackRook" + x, rook, blackRookSprite, (x == 0) ? (0) : (7), 7, chessPiece.TeamColor.BLACK);
-            createChessPiece("WhiteRook" + x, rook, whiteRookSprite, (x == 0) ? (0) : (7), 0, chessPiece.TeamColor.WHITE);
-        }
-        //Make Knights
-        for (int x = 0; x < 2; x++)
-        {
-            createChessPiece("BlackKnight" + x, knight, blackKnightSprite, (x == 0) ? (1) : (6), 7, chessPiece.TeamColor.BLACK);
-            createChessPiece("WhiteKnight" + x, knight, whiteKnightSprite, (x == 0) ? (1) : (6), 0, chessPiece.TeamColor.WHITE);
-        }
-        //Make Bishops
-        for (int x = 0; x < 2; x++)
-        {
-            createChessPiece("BlackBishop" + x, bishop, blackBishopSprite, (x == 0) ? (2) : (5), 7, chessPiece.TeamColor.BLACK);
-            createChessPiece("WhiteBishop" + x, bishop, whiteBishopSprite, (x == 0) ? (2) : (5), 0, chessPiece.TeamColor.WHITE);
-        }
-        //Make Queens
-        createChessPiece("BlackQueen", queen, blackQueenSprite, 3, 7, chessPiece.TeamColor.BLACK);
-        createChessPiece("WhiteQueen", queen, whiteQueenSprite, 3, 0, chessPiece.TeamColor.WHITE);
-        //Make Kings
-        createChessPiece("BlackKing", king, blackKingSprite, 4, 7, chessPiece.TeamColor.BLACK);
-        createChessPiece("WhiteKing", king, whiteKingSprite, 4, 0, chessPiece.TeamColor.WHITE);
+            case chessGameMode.SOLO:
+            case chessGameMode.SOLO_SELF_ATTACK:
+            case chessGameMode.TWO_PLAYER:
+            case chessGameMode.TWO_PLAYER_SELF_ATTACK:
+            case chessGameMode.TWO_AND_A_DIETY:
+                //Make Pawns
+                for (int x = 0; x < 8; x++)
+                {
+                    createChessPiece("BlackPawn" + x, pawn, blackPawnSprite, x, 6, chessPiece.TeamColor.BLACK);
+                    createChessPiece("WhitePawn" + x, pawn, whitePawnSprite, x, 1, chessPiece.TeamColor.WHITE);
+                }
+                //Make Rooks
+                for (int x = 0; x < 2; x++)
+                {
+                    createChessPiece("BlackRook" + x, rook, blackRookSprite, (x == 0) ? (0) : (7), 7, chessPiece.TeamColor.BLACK);
+                    createChessPiece("WhiteRook" + x, rook, whiteRookSprite, (x == 0) ? (0) : (7), 0, chessPiece.TeamColor.WHITE);
+                }
+                //Make Knights
+                for (int x = 0; x < 2; x++)
+                {
+                    createChessPiece("BlackKnight" + x, knight, blackKnightSprite, (x == 0) ? (1) : (6), 7, chessPiece.TeamColor.BLACK);
+                    createChessPiece("WhiteKnight" + x, knight, whiteKnightSprite, (x == 0) ? (1) : (6), 0, chessPiece.TeamColor.WHITE);
+                }
+                //Make Bishops
+                for (int x = 0; x < 2; x++)
+                {
+                    createChessPiece("BlackBishop" + x, bishop, blackBishopSprite, (x == 0) ? (2) : (5), 7, chessPiece.TeamColor.BLACK);
+                    createChessPiece("WhiteBishop" + x, bishop, whiteBishopSprite, (x == 0) ? (2) : (5), 0, chessPiece.TeamColor.WHITE);
+                }
+                //Make Queens
+                createChessPiece("BlackQueen", queen, blackQueenSprite, 3, 7, chessPiece.TeamColor.BLACK);
+                createChessPiece("WhiteQueen", queen, whiteQueenSprite, 3, 0, chessPiece.TeamColor.WHITE);
+                //Make Kings
+                createChessPiece("BlackKing", king, blackKingSprite, 4, 7, chessPiece.TeamColor.BLACK);
+                createChessPiece("WhiteKing", king, whiteKingSprite, 4, 0, chessPiece.TeamColor.WHITE);
+                break;
+            case chessGameMode.ASYNCHRONOUS:
+                foreach (pieceData pData in setup)
+                {
+                    chessPieceType type = null;
+                    Sprite sprite = null;
 
-        //Say the right turn.
-        setupNewGameUI();
+                    switch(pData._type)
+                    {
+                        case enumChessPieceType.PAWN:
+                            type = pawn;
+                            sprite = (pData._color == chessPiece.TeamColor.WHITE) ? (whitePawnSprite) : (blackPawnSprite);
+                            break;
+                        case enumChessPieceType.ROOK:
+                            type = rook;
+                            sprite = (pData._color == chessPiece.TeamColor.WHITE) ? (whiteRookSprite) : (blackRookSprite);
+                            break;
+                        case enumChessPieceType.KNIGHT:
+                            type = knight;
+                            sprite = (pData._color == chessPiece.TeamColor.WHITE) ? (whiteKnightSprite) : (blackKnightSprite);
+                            break;
+                        case enumChessPieceType.BISHOP:
+                            type = bishop;
+                            sprite = (pData._color == chessPiece.TeamColor.WHITE) ? (whiteBishopSprite) : (blackBishopSprite);
+                            break;
+                        case enumChessPieceType.QUEEN:
+                            type = queen;
+                            sprite = (pData._color == chessPiece.TeamColor.WHITE) ? (whiteQueenSprite) : (blackQueenSprite);
+                            break;
+                        case enumChessPieceType.KING:
+                            type = king;
+                            sprite = (pData._color == chessPiece.TeamColor.WHITE) ? (whiteKingSprite) : (blackKingSprite);
+                            break;
+                    }
+
+                    if (type != null)
+                    {
+                        chessPiece cPiece = createChessPiece(pData._name, type, sprite, pData._x, pData._y, pData._color);
+                        if (pData._isAlive == false)
+                        {
+                            removePieceFromList(cPiece);
+                            addPieceToCapturedList(cPiece);
+                        }
+                    }
+                }
+                break;
+        }
+
+        if(isGameOver == true)
+        {
+            gameOver(winner);
+        }
+        else
+        {
+            //Say the right turn.
+            setupNewGameUI();
+        }
+        
     }
 
     private chessPiece createChessPiece(string objectName, chessPieceType type, Sprite sprite, int x, int y, chessPiece.TeamColor teamColor)
@@ -891,6 +996,43 @@ public class controllerBoard : MonoBehaviour
         return processCommand(cmd);
     }
 
+    public void movePieceTo(componentPiece piece, int x, int y)
+    {
+        Vector2 pieceLocation = piece.getLocation();
+        movePiece(piece, x - (int)pieceLocation.x, y - (int)pieceLocation.y);
+    }
+
+    public void movePieceTo(string pieceName, int x, int y)
+    {
+        movePieceTo(getPieceByName(pieceName), x, y);
+    }
+
+    private void moveSelectedPieceToLocationLocal(int x, int y)
+    {
+        Vector2 selectLocation = _selectedPiece.getLocation();
+        movePiece(_selectedPiece, x - (int)selectLocation.x, y - (int)selectLocation.y);
+    }
+
+    private void moveSelectedPieceToLocationAsynchronous(int x, int y)
+    {
+        //Vector2 selectLocation = _selectedPiece.getLocation();
+        _controllerSFS.move(x, y, (chessPiece)_selectedPiece);
+    }
+
+    public void setPieceLocation(componentPiece piece, int x, int y, bool movePiece = true) //movePiece will activate all the good stuff like taking units and what not, while setting location is more lightweight
+    {
+        //Debug.Log("Moving piece " + piece.gameObject.name + " to (" + x + "," + y + ")");
+        if (movePiece)
+        {
+            piece.moveTo(x, y, this);
+        }
+        else
+        {
+            piece.setLocation(x, y);
+        }
+        piece.gameObject.transform.localPosition = new Vector3(BOARD_OFFSET_X + (x * BOARD_TILE_WIDTH), BOARD_OFFSET_Y + (y * BOARD_TILE_HEIGHT), PIECE_Z);
+    }
+
     //NOTE: capture piece is specific to chess.
     public bool capturePiece(componentPiece captured, componentPiece capturer)
     {
@@ -901,7 +1043,7 @@ public class controllerBoard : MonoBehaviour
     public void addPieceToList(componentPiece piece)
     {
         _pieces.Add(piece);
-        Debug.Log("Num Pieces : " + _pieces.Count);
+        //Debug.Log("Num Pieces : " + _pieces.Count);
         piece.gameObject.transform.SetParent(gameObject.transform, false);
     }
 
@@ -927,28 +1069,6 @@ public class controllerBoard : MonoBehaviour
             }
         }
         return count;
-    }
-
-    private void moveSelectedPieceToLocation(int x, int y)
-    {
-        Vector2 selectLocation = _selectedPiece.getLocation();
-        movePiece(_selectedPiece, x - (int)selectLocation.x, y - (int)selectLocation.y);
-    }
-
-    public void movePieceToLocation(componentPiece piece, int x, int y, bool updatePiece = true)
-    {
-        Debug.Log("Moving piece " + piece.gameObject.name + " to (" + x + "," + y + ")");
-        if (updatePiece)
-        {
-            piece.moveTo(x, y, this);
-        }
-        piece.gameObject.transform.localPosition = new Vector3(BOARD_OFFSET_X + (x * BOARD_TILE_WIDTH), BOARD_OFFSET_Y + (y * BOARD_TILE_HEIGHT), PIECE_Z);
-    }
-
-    internal void setPieceLocation(componentPiece piece, int x, int y)
-    {
-        piece.setLocation(x, y);
-        piece.gameObject.transform.localPosition = new Vector3(BOARD_OFFSET_X + (x * BOARD_TILE_WIDTH), BOARD_OFFSET_Y + (y * BOARD_TILE_HEIGHT), PIECE_Z);
     }
 
     public List<componentPiece> getPiecesAtLocation(int x, int y)
@@ -987,6 +1107,18 @@ public class controllerBoard : MonoBehaviour
         return false;
     }
 
+    private componentPiece getPieceByName(string pieceName)
+    {
+        foreach (componentPiece cPiece in _pieces)
+        {
+            if(cPiece.gameObject.name.Equals(pieceName))
+            {
+                return cPiece;
+            }
+        }
+        return null;
+    }
+
     private bool selectPiece(componentPiece piece)
     {
         //Validate the piece can be selected
@@ -1012,7 +1144,7 @@ public class controllerBoard : MonoBehaviour
 
         //Move the selected tile object
         GameObject selectedThing = GameObject.Find("Selected Tile");
-        selectedThing.renderer.enabled = true;
+        selectedThing.GetComponent<Renderer>().enabled = true;
         //Debug.Log("Location : " + location.x + "," + location.y);
         selectedThing.transform.localPosition = new Vector3(BOARD_OFFSET_X + ((int)location.x * BOARD_TILE_WIDTH), BOARD_OFFSET_Y + ((int)location.y * BOARD_TILE_HEIGHT), TILE_EFFECT_Z);
 
@@ -1043,7 +1175,7 @@ public class controllerBoard : MonoBehaviour
         }
 
         GameObject selectedThing = GameObject.Find("Selected Tile");
-        selectedThing.renderer.enabled = false;
+        selectedThing.GetComponent<Renderer>().enabled = false;
 
         foreach (GameObject validMoveTileEffect in _validMoveTileEffects)
         {

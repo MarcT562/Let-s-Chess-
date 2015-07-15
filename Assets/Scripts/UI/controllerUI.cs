@@ -15,9 +15,8 @@ public class controllerUI : MonoBehaviour {
 
     private controllerBoard _board;
 
-	// Use this for initialization
-	void Start () {
-        showVictory(false);
+    void Awake()
+    {
 
         _txtCurrentTurn = objCurrentTurn.GetComponent<Text>();
         _txtVictory = objVictory.GetComponent<Text>();
@@ -26,10 +25,15 @@ public class controllerUI : MonoBehaviour {
         _cbCanAttackSelf = objCanAttackSelf.GetComponent<Toggle>();
 
         _board = gameObject.GetComponent<controllerBoard>();
+    }
+
+	void Start()
+    {
+        showVictory(false);
 	}
 	
-	// Update is called once per frame
-	void Update () {
+	void Update()
+    {
 	
 	}
 

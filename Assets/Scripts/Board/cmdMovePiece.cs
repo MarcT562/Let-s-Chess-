@@ -42,7 +42,7 @@ public class cmdMovePiece : boardCommand
 
         if (piece.canMoveTo(newX, newY, board))
         {
-            board.movePieceToLocation(_actor, newX, newY);
+            board.setPieceLocation(_actor, newX, newY);
             if(_resetAllValidMoves) //This is the quick to make way, the longer way involves only changing the affected pieces.
             {
                 foreach (componentPiece aPiece in board.getActivePieces())

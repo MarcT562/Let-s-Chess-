@@ -9,3 +9,10 @@ C:\Users\The Wizard\Documents\Chess\Temp\UnityVS_bin\Debug\UnityEditor.xml
 C:\Users\The Wizard\Documents\Chess\Temp\UnityVS_bin\Debug\UnityEngine.UI.xml
 C:\Users\The Wizard\Documents\Chess\obj\Debug\Assembly-CSharp.dll
 C:\Users\The Wizard\Documents\Chess\obj\Debug\Assembly-CSharp.pdb
+C:\Users\The Wizard\Documents\Chess\Temp\UnityVS_bin\Debug\SmartFox2X.dll
+C:\Users\The Wizard\Documents\Chess\Temp\UnityVS_bin\Debug\UnityEditor.iOS.Extensions.Xcode.dll
+C:\Users\The Wizard\Documents\Chess\Temp\UnityVS_bin\Debug\UnityEngine.Analytics.dll
+C:\Users\The Wizard\Documents\Chess\Temp\UnityVS_bin\Debug\UnityEngine.Networking.dll
+C:\Users\The Wizard\Documents\Chess\Temp\UnityVS_bin\Debug\UnityEngine.Networking.xml
+C:\Users\The Wizard\Documents\Chess\Temp\UnityVS_bin\Debug\UnityEngine.Analytics.xml
+C:\Users\The Wizard\Documents\Chess\Temp\UnityVS_bin\Debug\UnityEditor.iOS.Extensions.Xcode.xml
